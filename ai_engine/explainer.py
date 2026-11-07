@@ -1,6 +1,6 @@
 """
 AI Engine: Banking Transaction Anomaly Explanation Generator
-Supports Local SLMs via Ollama (Llama-3.2-3b, Gemma-3-4b) and Google Gemini API.
+Powered exclusively by Local SLMs via Ollama.
 """
 
 import json
@@ -8,63 +8,60 @@ import time
 import requests
 import os
 
-# ================= Configuration =================
-# Set USE_LOCAL_OLLAMA = False if using Gemini API
-USE_LOCAL_OLLAMA = True
-
-# Local Ollama Settings
-OLLAMA_URL = "http://localhost:11434/api/generate"
-OLLAMA_CHAT_URL = "http://localhost:11434/api/chat"
-OLLAMA_MODEL = "llama3.2:3b"  # or "gemma2:2b", "gemma:3b", "deepseek-r1"
-
-# Gemini API Settings (Optional cloud backup)
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "YOUR_GEMINI_API_KEY_HERE")
-# =================================================
+# ================= Ollama Configuration =================
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/generate")
+OLLAMA_CHAT_URL = os.getenv("OLLAMA_CHAT_URL", "http://localhost:11434/api/chat")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
+# ========================================================
 
 
-def _call_ollama(prompt: str, system_prompt: str = "") -> str:
-    """Calls local Ollama instance with timeout to guarantee < 10s response."""
+def _extract_flag_summary(tx: dict) -> str:
+    """Extracts human-readable anomaly descriptions instead of booleans."""
+    if tx.get("rule_rationales"):
+        return "; ".join(tx["rule_rationales"])
+    if tx.get("anomaly_codes"):
+        return ", ".join(tx["anomaly_codes"])
+    flag = tx.get("anomaly_flag")
+    if isinstance(flag, str) and flag.lower() not in ("true", "false"):
+        return flag
+    return "Unusual transaction characteristics detected"
+
+
+def _call_ollama_generate(prompt: str, system_prompt: str = "") -> str:
     payload = {
         "model": OLLAMA_MODEL,
         "prompt": prompt,
         "system": system_prompt,
         "stream": False,
         "options": {
-            "temperature": 0.2,      # Low temperature for strict factual grounding
-            "num_predict": 250        # Keep output concise to minimize latency
+            "temperature": 0.2,
+            "num_predict": 250
         }
     }
-    response = requests.post(OLLAMA_URL, json=payload, timeout=35)
+    response = requests.post(OLLAMA_URL, json=payload, timeout=12)
     response.raise_for_status()
     return response.json().get("response", "").strip()
 
 
-def _call_gemini(prompt: str, system_prompt: str = "") -> str:
-    """Calls Google Gemini API as cloud fallback."""
-    import google.generativeai as genai
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel(
-        model_name="gemini-1.5-flash",
-        system_instruction=system_prompt
-    )
-    response = model.generate_content(
-        prompt,
-        generation_config={"temperature": 0.2, "max_output_tokens": 250}
-    )
-    return response.text.strip()
+def _call_ollama_chat(messages: list) -> str:
+    payload = {
+        "model": OLLAMA_MODEL,
+        "messages": messages,
+        "stream": False,
+        "options": {
+            "temperature": 0.3,
+            "num_predict": 200
+        }
+    }
+    response = requests.post(OLLAMA_CHAT_URL, json=payload, timeout=12)
+    response.raise_for_status()
+    return response.json().get("message", {}).get("content", "").strip()
 
 
 def generate_explanation(transaction_data: dict, persona: str = "customer") -> dict:
-    """
-    Takes transaction JSON and outputs a grounded, structured explanation.
-    
-    :param transaction_data: dict containing transaction and anomaly flag details.
-    :param persona: 'customer' (plain English) or 'investigator' (technical details).
-    :return: dict with latency, explanation, and actions.
-    """
+    """Takes transaction JSON and outputs a grounded, structured explanation."""
     start_time = time.time()
-    
-    # Pre-extract values for prompt grounding
+    flag_summary = _extract_flag_summary(transaction_data)
     txn_json_str = json.dumps(transaction_data, indent=2)
 
     if persona.lower() == "customer":
@@ -78,13 +75,13 @@ def generate_explanation(transaction_data: dict, persona: str = "customer") -> d
             "### What you should do next\n"
             "<2-3 bullet points with simple action steps, e.g. confirm activity, lock card, contact support>"
         )
-    else:  # Investigator persona
+    else:
         system_prompt = (
             "You are a Senior Fraud Analytics Officer assistant. "
             "Analyze the transaction payload and generate an executive investigation summary.\n"
             "Format your response strictly as:\n"
             "### Anomaly Assessment\n"
-            "<Technical rationale citing the exact anomaly_flag, baseline comparison, and risk score>\n\n"
+            "<Technical rationale citing the exact anomaly flags, baseline comparison, and risk score>\n\n"
             "### Recommended Triage Protocol\n"
             "<Bullet points: KYC review, merchant blacklisting check, card reissuance priority>"
         )
@@ -92,20 +89,17 @@ def generate_explanation(transaction_data: dict, persona: str = "customer") -> d
     user_prompt = f"Analyze this transaction payload and provide your response:\n{txn_json_str}"
 
     try:
-        if USE_LOCAL_OLLAMA:
-            raw_text = _call_ollama(user_prompt, system_prompt)
-        else:
-            raw_text = _call_gemini(user_prompt, system_prompt)
-    except Exception as e:
-        # Graceful fallback if model service is unreachable
+        raw_text = _call_ollama_generate(user_prompt, system_prompt)
+    except Exception:
+        # Grounded deterministic fallback in case Ollama service is unreachable
         raw_text = (
-            f"### Notice\n"
-            f"Automated explanation fallback triggered: Transaction was flagged due to "
-            f"{transaction_data.get('anomaly_flag', 'unusual activity')} "
-            f"with a risk score of {transaction_data.get('risk_score', 'N/A')}.\n\n"
-            f"### Action Required\n"
-            f"• Please verify if you authorized this payment of {transaction_data.get('currency', '')} {transaction_data.get('amount', '')}.\n"
-            f"• Temporarily freeze your card if you do not recognize this merchant."
+            f"### Why this was flagged\n"
+            f"This transaction was flagged due to: {flag_summary} "
+            f"(Assigned risk score: {transaction_data.get('risk_score', 'N/A')}/100).\n\n"
+            f"### What you should do next\n"
+            f"• Confirm if you authorized this charge of {transaction_data.get('currency', 'INR')} {transaction_data.get('amount', '0.00')}.\n"
+            f"• Freeze your debit or credit card via the mobile banking app if unrecognized.\n"
+            f"• Contact bank security immediately to dispute the charge."
         )
 
     latency = round(time.time() - start_time, 2)
@@ -120,9 +114,7 @@ def generate_explanation(transaction_data: dict, persona: str = "customer") -> d
 
 
 def chat_with_agent(conversation_history: list, user_message: str, transaction_context: dict) -> str:
-    """
-    Handles follow-up questions from the user (multi-turn conversational agent).
-    """
+    """Handles multi-turn conversational follow-up questions."""
     system_prompt = (
         "You are a Banking Fraud Customer Support Agent. "
         "The customer is asking questions about a suspicious flagged transaction.\n"
@@ -133,15 +125,13 @@ def chat_with_agent(conversation_history: list, user_message: str, transaction_c
         "3. Provide clear instructions on what steps they or the bank can take."
     )
 
-    full_prompt = f"{system_prompt}\n\nRecent Conversation:\n"
-    for turn in conversation_history[-4:]:  # keep last 4 turns for context
-        full_prompt += f"{turn['role'].capitalize()}: {turn['content']}\n"
-    full_prompt += f"Customer: {user_message}\nAssistant:"
-
     try:
-        if USE_LOCAL_OLLAMA:
-            return _call_ollama(full_prompt)
-        else:
-            return _call_gemini(full_prompt)
+        messages = [{"role": "system", "content": system_prompt}]
+        for turn in conversation_history[-4:]:
+            role = "assistant" if turn.get("role") == "assistant" else "user"
+            messages.append({"role": role, "content": turn.get("content", "")})
+        messages.append({"role": "user", "content": user_message})
+        
+        return _call_ollama_chat(messages)
     except Exception:
-        return "I apologize, but I am having trouble connecting to security services right now. Please call fraud support directly at 1800-BANK-SAFE."
+        return "If you did not authorize this payment, please lock your card in the banking app immediately and reach out to fraud support at 1800-BANK-SAFE."
