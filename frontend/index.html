@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0b1020">
+  <title>FraudLens AI | Transaction Intelligence</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Fixed script filename reference -->
+  <script src="script.js" defer></script>
+</head>
+
+<body>
+  <div class="app">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-icon">F</div>
+        <div>
+          <h2>FraudLens <span>AI</span></h2>
+          <small>TRANSACTION INTELLIGENCE</small>
+        </div>
+      </div>
+
+      <p class="side-label">WORKSPACE</p>
+
+      <nav class="navigation">
+        <a href="#dashboard" class="nav-link active">
+          <span>◫</span>
+          <span>Dashboard</span>
+        </a>
+        <a href="#transactions" class="nav-link">
+          <span>▤</span>
+          <span>Transactions</span>
+        </a>
+        <a href="#explainer" class="nav-link">
+          <span>✧</span>
+          <span>AI Explainer</span>
+        </a>
+        <a href="#chatbot" class="nav-link">
+          <span>◉</span>
+          <span>Chatbot</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-bottom">
+        <div class="system-status">
+          <span class="status-dot"></span>
+          <span>Demo system online</span>
+        </div>
+        <p>Educational demo · Not a real banking service</p>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content" id="dashboard">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">RISK MANAGEMENT / OVERVIEW</p>
+          <h1>Transaction Intelligence</h1>
+          <p class="subtitle">Understand suspicious activity through clear explanations.</p>
+        </div>
+
+        <div class="topbar-actions">
+          <span class="live-pill"><span class="status-dot"></span> LIVE DEMO</span>
+          <select id="languageSelect" aria-label="Choose language">
+            <option value="en">English</option>
+            <option value="kn">ಕನ್ನಡ</option>
+            <option value="hi">हिन्दी</option>
+          </select>
+        </div>
+      </header>
+
+      <div class="notice">
+        <span class="notice-icon">ⓘ</span>
+        <p>Dashboard connected to GenAI transaction intelligence backend.</p>
+      </div>
+
+      <!-- STATISTICS -->
+      <section class="stats-grid">
+        <article class="stat-card">
+          <div class="stat-top">
+            <span>Total transactions</span>
+            <span class="stat-icon blue">▤</span>
+          </div>
+          <h2 id="totalCount">0</h2>
+          <p>Transactions loaded</p>
+        </article>
+
+        <article class="stat-card">
+          <div class="stat-top">
+            <span>Flagged transactions</span>
+            <span class="stat-icon orange">⚑</span>
+          </div>
+          <h2 id="flaggedCount">0</h2>
+          <p>Require review</p>
+        </article>
+
+        <article class="stat-card">
+          <div class="stat-top">
+            <span>High-risk alerts</span>
+            <span class="stat-icon red">⚠</span>
+          </div>
+          <h2 id="highCount">0</h2>
+          <p>Prioritize review</p>
+        </article>
+      </section>
+
+      <!-- TRANSACTION TABLE -->
+      <section class="panel" id="transactions">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">TRANSACTION MONITORING</p>
+            <h2>Transaction monitoring</h2>
+            <p class="muted">Select a record to explore its explanation.</p>
+          </div>
+          <span class="count-pill" id="recordCount">0 records</span>
+        </div>
+
+        <div class="table-controls">
+          <div class="search-box">
+            <span>⌕</span>
+            <input id="searchInput" type="search" placeholder="Search ID, location, or flag...">
+          </div>
+
+          <select id="riskFilter">
+            <option value="all">All transactions</option>
+            <option value="flagged">Flagged only</option>
+            <option value="high">High risk</option>
+            <option value="low">Low risk</option>
+          </select>
+        </div>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>TRANSACTION ID</th>
+                <th>AMOUNT</th>
+                <th>LOCATION</th>
+                <th>RISK</th>
+                <th>STATUS</th>
+              </tr>
+            </thead>
+            <tbody id="transactionTable">
+              <tr>
+                <td colspan="5" class="loading">Loading transactions from server...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- EXPLANATION PANEL -->
+      <section class="panel" id="explainer">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">INTELLIGENT EXPLANATION</p>
+            <h2>Why was this transaction flagged?</h2>
+          </div>
+          <span class="ai-pill">✧ GENAI EXPLAINER</span>
+        </div>
+
+        <div class="mode-buttons">
+          <button class="mode-btn active" data-mode="customer"><span>💬</span> Customer Mode</button>
+          <button class="mode-btn" data-mode="investigator"><span>🧑‍💻</span> Investigator Mode</button>
+        </div>
+
+        <div class="mode-result">
+          <div class="result-heading">
+            <div>
+              <span class="eyebrow">Selected Record</span>
+              <p id="modeTransaction">Select a transaction above.</p>
+            </div>
+            <span id="modeRisk" class="badge low">Score</span>
+          </div>
+          <div id="explanationContent" class="explanation-content">
+            Select a transaction row above to generate explanation.
+          </div>
+        </div>
+      </section>
+
+      <!-- CHATBOT -->
+      <section class="panel chatbot-panel" id="chatbot">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">FRAUDLENS ASSISTANT</p>
+            <h2>Ask about your transaction</h2>
+            <p class="muted">Choose a prompt or type your question.</p>
+          </div>
+          <div class="chat-avatar">✧</div>
+        </div>
+
+        <div id="chatWindow" class="chat-window"></div>
+
+        <div class="suggestions">
+          <button class="suggestion" data-question="why" type="button">Why was it flagged?</button>
+          <button class="suggestion" data-question="risk" type="button">Explain the risk</button>
+          <button class="suggestion" data-question="action" type="button">What should I do?</button>
+        </div>
+
+        <form id="chatForm" class="chat-form">
+          <input id="questionInput" type="text" placeholder="Ask about the selected transaction..." required autocomplete="off">
+          <button type="submit">Send ↑</button>
+        </form>
+      </section>
+
+      <footer class="page-footer">
+        <span>FraudLens AI</span>
+        <span>Risk indicators are advisory signals, not proof of fraud.</span>
+      </footer>
+    </main>
+  </div>
+</body>
+</html>
